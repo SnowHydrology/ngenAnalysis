@@ -1,3 +1,10 @@
+---
+title: "NextGen forcing analysis CSV to NetCDF conversion"
+author: "Keith Jennings"
+date: "9/27/2022"
+output: github_document
+---
+
 A quick look at NetCDF vs CSV forcing for NextGen
 
 Punch line: they're both the same, except for slight far decimal differences.
