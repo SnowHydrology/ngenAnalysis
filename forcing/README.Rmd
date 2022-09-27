@@ -1,0 +1,100 @@
+A quick look at NetCDF vs CSV forcing for NextGen
+
+Punch line: they're both the same, except for slight far decimal differences.
+
+The below code imports, matches, then analyzes the data.
+
+```{r}
+
+# Script for converting NLDAS-2 NETCDF files to CSV
+# Data downloaded from NASA GES DISC
+# Data are for Irwin Creek, catchment 87
+
+# Keith Jennings
+# keith.jennings@noaa.gov
+# 2020-11-20
+
+#Load packages
+library(tidyverse)
+library(ncdf4)
+
+# Identify input and output directories
+input_dir = "../data/forcing/"
+
+# list files
+nc_files <- data.frame(files = list.files(path = input_dir, pattern = ".nc$"), 
+                       stringsAsFactors = F)
+csv_files <- data.frame(files = list.files(path = input_dir, pattern = ".csv$"),
+                        stringsAsFactors = F)
+
+# Open the NetCDF file
+nc <- nc_open(paste0(input_dir, nc_files[1, "files"]))
+
+# Read and concatenate all of the csv data
+df = data.frame()
+ncRAINRATE = ncvar_get(nc, "RAINRATE")
+ncT2D = ncvar_get(nc, "T2D")
+ncQ2D = ncvar_get(nc, "Q2D")
+ncU2D = ncvar_get(nc, "U2D")
+ncV2D = ncvar_get(nc, "V2D")
+ncPSFC = ncvar_get(nc, "PSFC")
+ncSWDOWN = ncvar_get(nc, "SWDOWN")
+ncLWDOWN = ncvar_get(nc, "LWDOWN")
+ncIDS = ncvar_get(nc, "ids")
+
+for(i in 1:length(csv_files$files)){
+  # identify the catchment
+  tmpCat = str_extract(csv_files[i, "files"], "[^.]+")
+  
+  # Get the numeric column corresponding to the catchment in the netcdf file
+  tmpIds = which(ncIDS == tmpCat)
+ 
+  # Import the csv and add netcdf data for that catchment
+  tmp <- read.csv(paste0(input_dir, csv_files[i, "files"])) %>% 
+     mutate(cat = tmpCat,
+         ncRAINRATE = ncRAINRATE[, tmpIds],
+         ncT2D      = ncT2D[, tmpIds],
+         ncQ2D      = ncQ2D[, tmpIds],
+         ncU2D      = ncU2D[, tmpIds],
+         ncV2D      = ncV2D[, tmpIds],
+         ncPSFC     = ncPSFC[, tmpIds],
+         ncSWDOWN   = ncSWDOWN[, tmpIds],
+         ncLWDOWN   = ncLWDOWN[, tmpIds],)
+ 
+  # Bind to dataframe
+  df <- bind_rows(df, tmp)
+}
+
+# Make data longer
+df_l <- 
+  bind_cols(
+    df %>% select(RAINRATE:cat) %>% 
+      pivot_longer(where(is.numeric), names_to = "var_csv", values_to = "value_csv"),
+    df %>% select(ncRAINRATE:ncLWDOWN) %>% 
+      pivot_longer(where(is.numeric), names_to = "var_nc", values_to = "value_nc")
+  )
+
+# Summarize the data for bias
+df_summary <- df_l %>% 
+  na.omit() %>% 
+  group_by(cat, var_csv) %>% 
+  summarise(mean_bias = mean(value_csv - value_nc),
+            corr = cor(value_csv, value_nc))
+
+```
+
+Here's a table of per-catchment and variable biases and correlations:
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+df_summary %>% 
+  knitr::kable()
+```
+
+Most biases are 0 or near 0 and all correlations are 1. For non-zero biases, the difference appears to be at a very distant decimal point:
+
+```{r}
+df %>% slice(1) %>% pull(ncT2D) %>% sprintf("%.10f", .)
+df %>% slice(1) %>% pull(T2D) %>% sprintf("%.10f", .)
+```
+
+Probably an error induced by putting the CSV data into the NetCDF file.

@@ -1,0 +1,54 @@
+---
+title: "Noah-OWP-Modular Snow Modifications Analysis"
+author: "Keith Jennings"
+date: "2022-06-01"
+output: github_document
+---
+
+# Introduction
+
+This document details a first-look analysis of the snow modifications made to Noah-OWP-Modular. I will be presenting some of these results at the 2022 [Frontiers in Hydrology Meeting](https://www.agu.org/FIHM) in a talk titled [**Improving snow process representation in the National Water Model with the Next Generation Water Resources Modeling Framework**](https://agu.confex.com/agu/hydrology22/meetingapp.cgi/Paper/1032130).
+
+## A bit about the model
+
+[Noah-OWP-Modular](https://github.com/NOAA-OWP/noah-owp-modular) is a refactored, modularized version of the [Noah-MP](https://github.com/NCAR/noahmp/) land surface model that includes an implementation of the [Basic Model Interface](https://csdms.colorado.edu/wiki/BMI) (BMI). Originally developed for large-scale applications, Noah-MP and therefore early Noah-OWP-Modular versions include no terrain corrections for incoming solar radiation. In short, this means a steep south-facing slope would receive the same incoming solar radiation flux as a steep north-facing slope. 
+
+Another shortcoming of the original model code is its relatively simplistic treatment of precipitation phase. Noah-MP partitions precipitation into rain and snow as a function of near-surface air temperature only, despite the improvements in phase prediction offered by methods incorporating humidity (e.g., [Jennings et al., 2018](https://doi.org/10.1038/s41467-018-03629-7))
+
+## Noah-OWP-Modular improvements
+
+# Testing the snow modifications
+
+## Study site and time
+
+For this initial analysis, I 
+
+## 
+
+The `mros_cit_sci_obs_preprocess.R` script in `analysis/pre_processing` associates the following geospatial data with each observation:
+
+* Level II, III, and IV Ecoregions
+* US State
+* Elevation (m)
+
+The script also formats the time data and removes all observations submitted without geolocation info.
+
+
+
+# Looking at the data
+
+Now we can examine the data more in depth. First, we'll start an R session and import the file:
+
+```{r message = FALSE}
+# Load the tidyverse
+library(tidyverse)
+# Use cowplot for plot formatting and import plot styles
+library(cowplot); theme_set(theme_cowplot())
+source("functions/mros_plot_formats.R")
+# Lubridate for date handling tools
+library(lubridate)
+# Import data
+obs <- readRDS("../data/processed/mros_obs_processed_2020_2021.RDS")
+# Add factor level to phase to force Rain > Mixed > Snow order
+obs <- obs %>% mutate(phase = factor(phase, levels = c("Rain", "Mixed", "Snow")))
+```
