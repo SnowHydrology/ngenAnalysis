@@ -1,0 +1,85 @@
+---
+title: "Hydrograph Examples for AGU Town Hall 2022"
+author: "Keith Jennings"
+date: "2022-12-07"
+output: github_document
+---
+
+# Get the data
+
+Run the following code chunk to summarize the output data from 3 NextGen runs.
+
+```{r}
+# Load packages
+library(tidyverse)
+library(cowplot); theme_set(theme_cowplot())
+
+# Uncomment the source function if running the summary script
+# source("data_summarize.R")
+df <- readRDS("../data/flowTownHall2022/qout_dly_summary.RDS")
+
+# Add a path to save figures
+plot_path = "figures/"
+```
+
+# Compute summary functions
+```{r}
+# Put data into wider format so obs can be compared to sim
+df_compare <- 
+  left_join(filter(df, mod == "Obs."),
+            filter(df, mod != "Obs."),
+            by = c("date", "loc"), suffix = c("_obs", "_sim") )
+
+# Make the functions
+nse_FUN = function(x,y){1 - sum((x - y)^2)/
+    sum((x - mean(x))^2)}
+mean_bias_FUN = function(x, y){mean(y) - mean(x)}
+rmse_FUN = function(x, y){sqrt(sum((y - x)^2) * 1/length(x))}
+mae_FUN = function(x, y){mean(abs(y - x))}
+kge_FUN = function(x, y){1 - sqrt(((cor(x,y) - 1)^2) + (((sd(y)/sd(x)) - 1)^2) + (((mean(y)/mean(x)) - 1)^2))}
+
+# Summarize the data
+df_objFun <- df_compare %>% 
+  group_by(mod_sim, loc) %>% 
+  na.omit() %>% 
+  summarize(nse = nse_FUN(qout_cms_obs, qout_cms_sim),
+            kge = kge_FUN(qout_cms_obs, qout_cms_sim),
+            mean_bias = mean_bias_FUN(qout_cms_obs, qout_cms_sim),
+            rmse = rmse_FUN(qout_cms_obs, qout_cms_sim),
+            mae = mae_FUN(qout_cms_obs, qout_cms_sim))
+
+# Make a table
+knitr::kable(df_objFun)
+
+```
+
+# Plot the data
+
+```{r}
+# Make a color scheme
+flow_color_scale <- scale_color_manual(name = "Source", 
+                                       breaks = c("Obs.", "CFE", "CFE_X", "TOPMODEL", "NWM2.1"),
+                                       labels = c("Obs.", "CFE", "CFE_X", "TOPMODEL", "NWM2.1"),
+                                       values = c("black", "blue", "purple", "darkorange2", "green4"))
+
+# Add function levels to df to control plotting order
+df <- df %>% 
+  mutate(source = factor(mod, levels = c("Obs.", "CFE", "CFE_X", "TOPMODEL", "NWM2.1")))
+
+
+# Plot all
+flow_all_plot <- 
+  ggplot(filter(df, date >= as.Date("2010-10-01") & date <= as.Date("2011-09-30")), 
+         aes(date, qout_cms, color = source)) + 
+  geom_line() + 
+  facet_wrap(~loc, scales = "free_y", ncol = 2) + 
+  flow_color_scale + 
+  theme(legend.position = c(0.05, 0.25), 
+        legend.title = element_blank(),
+        plot.margin = unit(c(5.5,12,5.5,5.5), "pt")) + 
+  labs(x = "Date", y = expression("Discharge ("*m^3*" "*s^-1*")"))
+save_plot(plot = flow_all_plot, filename = paste0(plot_path, "flow_all.png"), 
+          base_height = 4, base_width = 8)
+
+```
+
